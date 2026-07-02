@@ -863,6 +863,12 @@ class WhisperManager {
           if (code === 0) {
             try {
               const result = JSON.parse(stdout);
+              if (result?.success === false) {
+                reject(
+                  new Error(result.error || "Model download failed")
+                );
+                return;
+              }
               resolve(result);
             } catch (parseError) {
               console.error("Failed to parse download result:", parseError);
@@ -877,8 +883,9 @@ class WhisperManager {
             if (code === 143 || code === 137 || code === null) {
               reject(new Error("Download interrupted by user"));
             } else {
-              console.error("Model download failed with code:", code);
-              reject(new Error(`Model download failed (exit code ${code})`));
+              console.error("Model download failed with code:", code, stderr);
+              const detail = stderr.trim() ? `: ${stderr.trim()}` : "";
+              reject(new Error(`Model download failed (exit code ${code})${detail}`));
             }
           }
         });

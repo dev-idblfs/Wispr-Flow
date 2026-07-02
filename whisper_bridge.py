@@ -10,11 +10,36 @@ import tempfile
 import os
 import argparse
 from pathlib import Path
-import whisper
 import threading
 import time
 import requests
 import gc
+
+def configure_ssl_certificates():
+    """Ensure HTTPS model downloads work on macOS Python installs."""
+    try:
+        import certifi
+        cert_path = certifi.where()
+        os.environ.setdefault("SSL_CERT_FILE", cert_path)
+        os.environ.setdefault("REQUESTS_CA_BUNDLE", cert_path)
+        os.environ.setdefault("CURL_CA_BUNDLE", cert_path)
+    except ImportError:
+        pass
+
+configure_ssl_certificates()
+
+try:
+    import whisper
+except ImportError as import_error:
+    print(json.dumps({
+        "success": False,
+        "error": (
+            "openai-whisper is not installed. "
+            "Install it from the app settings or run: pip install openai-whisper"
+        ),
+        "details": str(import_error),
+    }))
+    sys.exit(1)
 
 def get_ffmpeg_path():
     """Get path to bundled FFmpeg executable with proper production support"""
@@ -481,6 +506,8 @@ def main():
     if args.mode == "download":
         result = download_model(args.model)
         print(json.dumps(result))
+        if not result.get("success", False):
+            sys.exit(1)
         return
     elif args.mode == "check":
         result = check_model_status(args.model)

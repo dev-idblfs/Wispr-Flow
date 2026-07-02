@@ -2,6 +2,10 @@
 
 An open source desktop dictation application that converts speech to text using OpenAI Whisper. Features both local and cloud processing options for maximum flexibility and privacy.
 
+## For AI Assistants
+
+If you are an AI coding agent working on this repo, start with **[AGENTS.md](AGENTS.md)** for onboarding, architecture, and conventions. Deeper reference: [CLAUDE.md](CLAUDE.md), [docs/QUICKSTART.md](docs/QUICKSTART.md), [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details. This means you can freely use, modify, and distribute this software for personal or commercial purposes.

@@ -1,4 +1,4 @@
-const { clipboard } = require("electron");
+const { app, clipboard, systemPreferences } = require("electron");
 const { spawn, spawnSync } = require("child_process");
 
 class ClipboardManager {
@@ -64,6 +64,15 @@ class ClipboardManager {
     }
   }
 
+  getAccessibilityTargetName() {
+    const isDev =
+      process.env.NODE_ENV === "development" ||
+      process.argv.includes("--dev") ||
+      process.defaultApp;
+
+    return isDev ? "Electron" : app.getName() || "OpenWhispr";
+  }
+
   async pasteMacOS(originalClipboard) {
     return new Promise((resolve, reject) => {
       setTimeout(() => {
@@ -96,7 +105,15 @@ class ClipboardManager {
             }, 100);
             resolve();
           } else {
-            const errorMsg = `Paste failed (code ${code}). Text is copied to clipboard - please paste manually with Cmd+V.`;
+            if (this.isKeystrokePermissionError(errorOutput)) {
+              this.showAccessibilityDialog(errorOutput);
+              systemPreferences.isTrustedAccessibilityClient(true);
+            }
+
+            const detail = errorOutput.trim()
+              ? ` ${errorOutput.trim()}`
+              : "";
+            const errorMsg = `Paste failed (code ${code}).${detail} Text is copied to clipboard - please paste manually with Cmd+V.`;
             reject(new Error(errorMsg));
           }
         });
@@ -251,23 +268,37 @@ class ClipboardManager {
     throw err;
   }
 
+  isKeystrokePermissionError(errorText = "") {
+    return (
+      errorText.includes("not allowed to send keystrokes") ||
+      errorText.includes("not allowed assistive access") ||
+      errorText.includes("(-1719)") ||
+      errorText.includes("(-25006)") ||
+      errorText.includes("(1002)")
+    );
+  }
+
   async checkAccessibilityPermissions() {
     if (process.platform !== "darwin") return true;
 
-    return new Promise((resolve) => {
-      // Check accessibility permissions
+    const isTrusted = systemPreferences.isTrustedAccessibilityClient(false);
+    if (isTrusted) {
+      return this.verifyKeystrokePermission();
+    }
 
+    systemPreferences.isTrustedAccessibilityClient(true);
+    this.showAccessibilityDialog("");
+    return false;
+  }
+
+  async verifyKeystrokePermission() {
+    return new Promise((resolve) => {
       const testProcess = spawn("osascript", [
         "-e",
-        'tell application "System Events" to get name of first process',
+        'tell application "System Events" to keystroke ""',
       ]);
 
-      let testOutput = "";
       let testError = "";
-
-      testProcess.stdout.on("data", (data) => {
-        testOutput += data.toString();
-      });
 
       testProcess.stderr.on("data", (data) => {
         testError += data.toString();
@@ -276,60 +307,66 @@ class ClipboardManager {
       testProcess.on("close", (code) => {
         if (code === 0) {
           resolve(true);
-        } else {
-          this.showAccessibilityDialog(testError);
-          resolve(false);
+          return;
         }
+
+        if (this.isKeystrokePermissionError(testError)) {
+          this.showAccessibilityDialog(testError);
+          systemPreferences.isTrustedAccessibilityClient(true);
+          resolve(false);
+          return;
+        }
+
+        // Non-permission AppleScript errors should not block paste attempts.
+        resolve(true);
       });
 
-      testProcess.on("error", (error) => {
+      testProcess.on("error", () => {
         resolve(false);
       });
     });
   }
 
   showAccessibilityDialog(testError) {
-    const isStuckPermission =
-      testError.includes("not allowed assistive access") ||
-      testError.includes("(-1719)") ||
-      testError.includes("(-25006)");
+    const isStuckPermission = this.isKeystrokePermissionError(testError);
+    const targetApp = this.getAccessibilityTargetName();
+    const isDev = targetApp === "Electron";
 
     let dialogMessage;
     if (isStuckPermission) {
-      dialogMessage = `🔒 OpenWhispr needs Accessibility permissions, but it looks like you may have OLD PERMISSIONS from a previous version.
+      dialogMessage = `OpenWhispr needs Accessibility permission to simulate Cmd+V.
 
-❗ COMMON ISSUE: If you've rebuilt/reinstalled OpenWhispr, the old permissions may be "stuck" and preventing new ones.
+In dev mode, macOS usually lists the app as "${targetApp}" (not OpenWhispr).
 
-🔧 To fix this:
-1. Open System Settings → Privacy & Security → Accessibility
-2. Look for ANY old "OpenWhispr" entries and REMOVE them (click the - button)
-3. Also remove any entries that say "Electron" or have unclear names
-4. Click the + button and manually add the NEW OpenWhispr app
-5. Make sure the checkbox is enabled
-6. Restart OpenWhispr
+To fix:
+1. Open System Settings -> Privacy & Security -> Accessibility
+2. Remove stale OpenWhispr or Electron entries
+3. Add "${targetApp}" and enable it
+4. Restart the app
 
-⚠️ This is especially common during development when rebuilding the app.
+Without this, text is copied to clipboard only.
 
-📝 Without this permission, text will only copy to clipboard (no automatic pasting).
+Open System Settings now?`;
+    } else if (isDev) {
+      dialogMessage = `OpenWhispr needs Accessibility permission to paste automatically.
 
-Would you like to open System Settings now?`;
+When running npm run dev, enable "${targetApp}" in:
+System Settings -> Privacy & Security -> Accessibility
+
+Then restart the app. Text will stay on the clipboard until then.
+
+Open System Settings now?`;
     } else {
-      dialogMessage = `🔒 OpenWhispr needs Accessibility permissions to paste text into other applications.
+      dialogMessage = `OpenWhispr needs Accessibility permissions to paste text into other applications.
 
-📋 Current status: Clipboard copy works, but pasting (Cmd+V simulation) fails.
+Clipboard copy works, but Cmd+V simulation is blocked.
 
-🔧 To fix this:
-1. Open System Settings (or System Preferences on older macOS)
-2. Go to Privacy & Security → Accessibility
-3. Click the lock icon and enter your password
-4. Add OpenWhispr to the list and check the box
-5. Restart OpenWhispr
+To fix:
+1. Open System Settings -> Privacy & Security -> Accessibility
+2. Add "${targetApp}" and enable it
+3. Restart OpenWhispr
 
-⚠️ Without this permission, dictated text will only be copied to clipboard but won't paste automatically.
-
-💡 In production builds, this permission is required for full functionality.
-
-Would you like to open System Settings now?`;
+Open System Settings now?`;
     }
 
     const permissionDialog = spawn("osascript", [

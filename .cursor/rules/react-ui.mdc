@@ -1,0 +1,44 @@
+---
+description: React UI, hooks, and component conventions for OpenWhispr
+globs: src/components/**,src/hooks/**,src/App.jsx,src/main.jsx
+alwaysApply: false
+---
+
+# React UI Rules
+
+## Stack
+
+- React 19 + TypeScript (new components) / JSX (legacy `App.jsx`)
+- Tailwind CSS v4 — config in `src/index.css` via `@theme`
+- shadcn/ui components in `src/components/ui/` (Radix primitives)
+
+## Patterns
+
+- Use `const handleClick = () =>` naming for event handlers
+- Early returns for loading/error states
+- Tailwind classes only — no separate CSS files for components
+- Accessibility: `aria-label`, keyboard handlers on interactive elements
+
+## Settings & State
+
+- App settings: `useSettings.ts` + localStorage keys (see CLAUDE.md §5)
+- Audio recording: `useAudioRecording.js`
+- Hotkeys: `useHotkey.js`
+- Permissions: `usePermissions.ts`
+
+## IPC from Renderer
+
+Access main process only via `window.api.*` (defined in `preload.js`). Never import Electron in renderer directly.
+
+## Component Layout
+
+- `App.jsx` — minimal overlay (recording states, drag handle)
+- `ControlPanel.tsx` — tabbed settings, history, model picker
+- `OnboardingFlow.tsx` — 8-step first-run wizard
+- `SettingsPage.tsx` — detailed settings forms
+
+## Styling
+
+- `cn()` from `src/components/lib/utils.ts` for conditional classes
+- Lucide React for icons
+- Dark mode via Tailwind `@variant` in `index.css`

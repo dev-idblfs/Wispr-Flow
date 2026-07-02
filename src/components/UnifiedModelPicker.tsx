@@ -11,6 +11,7 @@ import {
   Globe 
 } from "lucide-react";
 import { useDialogs } from "../hooks/useDialogs";
+import { ConfirmDialog, AlertDialog } from "./ui/dialog";
 import { useToast } from "./ui/Toast";
 import { formatBytes } from "../utils/formatBytes";
 import "../types/electron";
@@ -173,6 +174,10 @@ export default function UnifiedModelPicker({
   const {
     showConfirmDialog,
     showAlertDialog,
+    confirmDialog,
+    alertDialog,
+    hideConfirmDialog,
+    hideAlertDialog,
   } = useDialogs();
   const { toast } = useToast();
   const styles = useMemo(() => VARIANT_STYLES[variant], [variant]);
@@ -318,11 +323,16 @@ export default function UnifiedModelPicker({
 
       if (modelType === 'whisper') {
         const result = await window.electronAPI.downloadWhisperModel(modelId);
-        if (!result.success && !result.error?.includes("interrupted by user")) {
-          showAlertDialog({
-            title: "Download Failed",
-            description: `Failed to download model: ${result.error}`,
-          });
+        if (!result?.success) {
+          const errorMessage =
+            result?.error ||
+            "Model download failed. Check your network connection and try again.";
+          if (!errorMessage.includes("interrupted by user")) {
+            showAlertDialog({
+              title: "Download Failed",
+              description: errorMessage,
+            });
+          }
         }
       } else {
         await window.electronAPI.modelDownload(modelId);
@@ -452,6 +462,23 @@ export default function UnifiedModelPicker({
 
   return (
     <div className={`${styles.container} ${className}`}>
+      <ConfirmDialog
+        open={confirmDialog.open}
+        onOpenChange={hideConfirmDialog}
+        title={confirmDialog.title}
+        description={confirmDialog.description}
+        onConfirm={confirmDialog.onConfirm}
+        variant={confirmDialog.variant}
+      />
+
+      <AlertDialog
+        open={alertDialog.open}
+        onOpenChange={(open) => !open && hideAlertDialog()}
+        title={alertDialog.title}
+        description={alertDialog.description}
+        onOk={() => {}}
+      />
+
       {progressDisplay}
 
       <div className="p-4">

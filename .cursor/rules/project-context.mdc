@@ -1,0 +1,49 @@
+---
+description: OpenWhispr project context — always-on orientation for AI agents
+alwaysApply: true
+---
+
+# OpenWhispr Project Context
+
+**App**: OpenWhispr (`open-whispr` v1.0.12) — Electron desktop dictation using OpenAI Whisper.
+**Folder**: May be named `Wispr-Flow`; treat as the same project.
+
+## What It Does
+
+Global hotkey → record speech → transcribe (local Python Whisper or cloud API) → optional AI reasoning → auto-paste at cursor.
+
+## Architecture
+
+- **Dual windows**: overlay dictation UI + control panel (same React app, URL routing)
+- **Process split**: main (`main.js`, `src/helpers/`) ↔ renderer (`src/`) via `preload.js` IPC bridge
+- **Audio pipeline**: MediaRecorder → Base64 IPC → temp file → FFmpeg → `whisper_bridge.py` → paste + SQLite
+
+## Dev Commands
+
+```bash
+npm install    # rebuilds better-sqlite3 via postinstall
+npm run dev      # Vite :5174 + Electron --dev
+npm run pack     # unsigned build for personal use
+```
+
+macOS Globe key: requires Xcode CLI tools; built by `predev` → `compile:globe`.
+
+## Key Entry Points
+
+- `main.js` — Electron bootstrap
+- `src/App.jsx` — dictation overlay
+- `src/components/ControlPanel.tsx` — settings/history
+- `src/helpers/ipcHandlers.js` — all IPC handlers
+- `whisper_bridge.py` — local Whisper
+
+## Conventions
+
+- New IPC: `ipcHandlers.js` + `preload.js`
+- New settings: `useSettings.ts` + `SettingsPage.tsx`
+- Never commit `.env`, `dist/`, `node_modules/`
+
+## More Context
+
+- [AGENTS.md](../../AGENTS.md) — agent onboarding
+- [CLAUDE.md](../../CLAUDE.md) — deep technical reference
+- `.cursor/skills/openwhispr-dev-setup/` and `openwhispr-debug/`

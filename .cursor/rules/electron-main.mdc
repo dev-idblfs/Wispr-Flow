@@ -1,0 +1,45 @@
+---
+description: Electron main process and helper module conventions
+globs: main.js,preload.js,src/helpers/**
+alwaysApply: false
+---
+
+# Electron Main Process Rules
+
+## IPC Pattern
+
+Every new IPC channel requires **both**:
+1. Handler in `src/helpers/ipcHandlers.js`
+2. Exposed method in `preload.js` on `window.api`
+
+Use `ipcMain.handle` for request/response; validate inputs; never expose raw `ipcRenderer` to renderer.
+
+## Helper Modules (`src/helpers/`)
+
+- One concern per file (e.g. `whisper.js`, `database.js`, `clipboard.js`)
+- Initialize managers in `main.js` at startup
+- Use `debugLogger.js` for pipeline logging when `OPENWHISPR_DEBUG=true`
+
+## Native Modules
+
+- `better-sqlite3` — rebuilt on `npm install` via `electron-builder install-app-deps`
+- `ffmpeg-static` — unpacked from ASAR; pass path to Python bridge via `FFMPEG_PATH` env vars
+
+## Audio / Whisper Flow
+
+1. Receive Base64 audio from renderer via IPC
+2. Write temp file, run FFmpeg conversion
+3. Spawn `whisper_bridge.py` with model + language args
+4. Delete temp file after processing; 30s timeout on Python bridge
+
+## Platform Notes
+
+- **macOS**: Accessibility permission for clipboard paste; AppleScript fallback in `clipboard.js`
+- **macOS Globe key**: Swift binary in `resources/bin/`, compiled by `scripts/build-globe-listener.js`
+- **Windows/Linux**: Python auto-install via `pythonInstaller.js`
+
+## Security
+
+- Context isolation enabled; no `nodeIntegration` in renderer
+- Sanitize file paths; limit IPC surface area
+- API keys via environment / in-app settings — never hardcode

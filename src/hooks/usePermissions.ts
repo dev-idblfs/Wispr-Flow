@@ -57,11 +57,14 @@ export const usePermissions = (
       }
     } catch (err) {
       console.error("Accessibility permission test failed:", err);
+      const message =
+        err instanceof Error && err.message.includes("Paste failed")
+          ? "Enable Electron in System Settings → Privacy & Security → Accessibility when running npm run dev, then restart the app."
+          : "Please grant accessibility permissions in System Settings to enable automatic text pasting.";
       if (showAlertDialog) {
         showAlertDialog({
           title: "❌ Accessibility Permissions Needed",
-          description:
-            "Please grant accessibility permissions in System Settings to enable automatic text pasting.",
+          description: message,
         });
       } else {
         alert(
